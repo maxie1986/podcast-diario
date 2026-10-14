@@ -28,7 +28,7 @@ Un push a `main` con un archivo nuevo dispara la Action que genera el MP3 y actu
 
 ## Estilo
 
-- Entre 2.700 y 3.000 palabras (unos 20 minutos).
+- Entre 3.100 y 3.300 palabras (la voz lee unas 160 por minuto, así que da unos 20 minutos).
 - Castellano rioplatense, con voseo natural, tono de divulgación cercano. Pensado para escucharse manejando.
 - Escrito para el oído: oraciones cortas o medianas, sin tablas, listas, paréntesis ni símbolos (escribir "microsegundos", no "µs"; "por ciento", no "%").
 - Números redondeados y fáciles de seguir. Pocas cifras por párrafo.
