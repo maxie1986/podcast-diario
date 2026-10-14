@@ -1,0 +1,60 @@
+name: Generar episodio y publicar feed
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "episodes/**"
+      - "scripts/**"
+      - ".github/workflows/podcast.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: podcast
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EDGE_VOICE: ${{ vars.EDGE_VOICE || 'es-AR-TomasNeural' }}
+      EDGE_RATE: ${{ vars.EDGE_RATE || '+0%' }}
+      GOOGLE_VOICE: ${{ vars.GOOGLE_VOICE || 'es-US-Neural2-B' }}
+      GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pip install -q edge-tts
+
+      - name: Generar audio de episodios nuevos
+        run: python scripts/generate_audio.py
+
+      - name: Armar feed y página
+        run: python scripts/build_feed.py
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
