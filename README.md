@@ -11,7 +11,7 @@ Podcast diario de unos 20 minutos sobre un tema distinto cada día.
 2. La Action `.github/workflows/podcast.yml` convierte a MP3 los episodios nuevos (`scripts/generate_audio.py`) y publica cada uno como un release `ep-*`.
 3. La misma Action regenera `feed.xml` e `index.html` a partir de los releases (`scripts/build_feed.py`) y los publica en GitHub Pages.
 
-Los MP3 viven como assets de releases, así el repo no crece con archivos de audio.
+Los MP3 se guardan como assets de releases, así el repo no crece con archivos de audio. Al publicar, los últimos 30 se copian al sitio de Pages (`audio/`) y el feed apunta ahí: GitHub sirve los assets de releases como `application/octet-stream` y Apple Podcasts no los reproduce.
 
 ## Voz
 

@@ -8,6 +8,7 @@ from datetime import datetime
 from email.utils import format_datetime
 from html import escape
 from pathlib import Path
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "_site"
@@ -19,6 +20,7 @@ BASE_URL = f"https://{OWNER}.github.io/{NAME}/"
 TITLE = "Veinte Minutos"
 DESCRIPTION = "Un tema distinto cada día, contado en unos veinte minutos."
 AUTHOR = OWNER
+MAX_EPISODES = 30  # unos 220 MB; Pages admite hasta 1 GB por sitio
 
 
 def releases() -> list[dict]:
@@ -52,10 +54,21 @@ def build() -> None:
     if cover.exists():
         shutil.copy(cover, SITE / "cover.png")
 
-    episodes = releases()
+    # Apple Podcasts rechaza los assets de releases (se sirven como
+    # application/octet-stream). Se copian los últimos MAX_EPISODES MP3 al
+    # sitio de Pages, que los sirve como audio/mpeg con soporte de rangos.
+    episodes = releases()[:MAX_EPISODES]
+    audio_dir = SITE / "audio"
+    audio_dir.mkdir(exist_ok=True)
     entries, rows = [], []
     for item in episodes:
         release, asset, notes = item["release"], item["asset"], item["notes"]
+        subprocess.run(
+            ["gh", "release", "download", release["tag_name"], "-R", REPO,
+             "-p", asset["name"], "-D", str(audio_dir), "--clobber"],
+            check=True,
+        )
+        audio_url = f"{BASE_URL}audio/{quote(asset['name'])}"
         published = datetime.fromisoformat(release["published_at"].replace("Z", "+00:00"))
         description = notes.get("description", "")
         duration = int(notes.get("duration", 0))
@@ -64,7 +77,7 @@ def build() -> None:
       <description>{escape(description)}</description>
       <guid isPermaLink="false">{escape(release["tag_name"])}</guid>
       <pubDate>{format_datetime(published)}</pubDate>
-      <enclosure url="{escape(asset["browser_download_url"])}" length="{asset["size"]}" type="audio/mpeg"/>
+      <enclosure url="{escape(audio_url)}" length="{asset["size"]}" type="audio/mpeg"/>
       <itunes:duration>{hms(duration)}</itunes:duration>
       <itunes:explicit>false</itunes:explicit>
     </item>""")
@@ -72,7 +85,7 @@ def build() -> None:
             f'<li><strong>{escape(release["name"])}</strong> '
             f'<span>{published:%d/%m/%Y} · {duration // 60} min</span>'
             f'<p>{escape(description)}</p>'
-            f'<audio controls preload="none" src="{escape(asset["browser_download_url"])}"></audio></li>'
+            f'<audio controls preload="none" src="{escape(audio_url)}"></audio></li>'
         )
 
     feed = f"""<?xml version="1.0" encoding="UTF-8"?>
