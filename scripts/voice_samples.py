@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from generate_audio import parse_episode, to_speech_text  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-KEY = os.environ["GOOGLE_TTS_API_KEY"].strip()
+KEY = os.environ.get("GOOGLE_TTS_API_KEY", "").strip()
 VOICES = [v.strip() for v in os.environ.get("VOICES", "").split(",") if v.strip()]
 TAG = "muestras-voces"
 SAMPLE_CHARS = 1400  # unos 80 segundos de audio
@@ -58,6 +58,9 @@ def synthesize(text: str, voice: str, out: Path) -> None:
 
 
 def main() -> None:
+    if not KEY:
+        print("::error::Falta el secret GOOGLE_TTS_API_KEY (o está vacío)")
+        sys.exit(1)
     text = sample_text()
     out_dir = ROOT / "build" / "muestras"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -70,7 +73,7 @@ def main() -> None:
             print(f"OK {voice}")
         except Exception as error:  # noqa: BLE001
             errors.append(str(error))
-            print(f"ERROR {error}", file=sys.stderr)
+            print(f"::error::{str(error).replace(chr(10), ' ')}")
 
     if files:
         exists = subprocess.run(["gh", "release", "view", TAG], capture_output=True).returncode == 0
