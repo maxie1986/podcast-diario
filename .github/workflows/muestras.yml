@@ -1,0 +1,26 @@
+name: Muestras de voces
+
+on:
+  workflow_dispatch:
+    inputs:
+      voices:
+        description: "Voces de Google separadas por coma"
+        default: "es-US-Chirp3-HD-Charon,es-US-Chirp3-HD-Puck,es-US-Chirp3-HD-Kore,es-US-Chirp3-HD-Aoede,es-ES-Chirp3-HD-Charon"
+
+permissions:
+  contents: write
+
+jobs:
+  muestras:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
+      VOICES: ${{ inputs.voices }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: python scripts/voice_samples.py
