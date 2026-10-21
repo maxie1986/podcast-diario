@@ -170,7 +170,7 @@ def make_cover(episode: dict, out: Path) -> str:
             background = gemini_illustration(episode)
             method = f"Gemini ({IMAGE_MODEL})"
         except Exception as error:  # noqa: BLE001
-            print(f"::warning::Portada con IA falló, uso plantilla: {str(error).replace(chr(10), ' ')}")
+            print(f"::warning::Portada con IA falló, uso plantilla: {str(error).replace(chr(10), ' ')}", file=sys.stderr)
     if background is None:
         background = template_background(episode)
     compose(background, episode).save(out, "JPEG", quality=88, optimize=True)
