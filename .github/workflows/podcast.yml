@@ -37,7 +37,7 @@ jobs:
       - name: Instalar dependencias
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-          pip install -q edge-tts
+          pip install -q edge-tts pillow
 
       - name: Generar audio de episodios nuevos
         run: python scripts/generate_audio.py

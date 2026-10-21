@@ -9,7 +9,7 @@ Archivo nuevo en `episodes/AAAA-MM-DD-slug.md` (fecha del día, slug corto en mi
 ```
 ---
 title: "Título atractivo, menos de 60 caracteres"
-description: "Una o dos oraciones que resuman el episodio."
+description: "Una o dos oraciones que resuman el episodio y den ganas de escucharlo."
 topic: categoría / subcategoría
 date: AAAA-MM-DD
 ---
@@ -17,7 +17,9 @@ date: AAAA-MM-DD
 Texto del episodio...
 ```
 
-Un push a `main` con un archivo nuevo dispara la Action que genera el MP3 y actualiza el feed. No hace falta nada más.
+Un push a `main` con un archivo nuevo dispara la Action que genera el MP3, la portada (ilustración con IA a partir del título, la descripción y el topic, con el título encima) y actualiza el feed. No hace falta nada más.
+
+El título y la descripción se ven en Spotify y Apple Podcasts y alimentan la portada: el título tiene que ser concreto y atractivo (mejor "Por qué el cielo es azul" que "Episodio sobre la luz") y la descripción tiene que contar de qué trata, no solo repetir el título.
 
 ## Elección del tema
 

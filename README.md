@@ -13,6 +13,12 @@ Podcast diario de unos 20 minutos sobre un tema distinto cada día.
 
 Los MP3 se guardan como assets de releases, así el repo no crece con archivos de audio. Al publicar, los últimos 30 se copian al sitio de Pages (`audio/`) y el feed apunta ahí: GitHub sirve los assets de releases como `application/octet-stream` y Apple Podcasts no los reproduce.
 
+## Portadas
+
+Cada episodio lleva su propia portada (`scripts/generate_cover.py`): una ilustración generada con Gemini a partir del título, la descripción y el topic, con el título encima. Usa la misma API key de Google (o el secret `GEMINI_API_KEY` si existe) y el modelo de la variable `IMAGE_MODEL` (default `gemini-2.5-flash-image`). Si la generación falla, arma una portada de plantilla, así el episodio nunca se queda sin imagen. Tipografía: Archivo Black (SIL Open Font License).
+
+Para probar una portada sin publicar nada: Actions → Prueba de portada → Run workflow.
+
 ## Voz
 
 Por defecto usa Google Cloud Text-to-Speech con la voz `es-US-Chirp3-HD-Charon` (secret `GOOGLE_TTS_API_KEY`; capa gratuita de 1 millón de caracteres por mes en voces Chirp 3 HD). Si Google falla, cae a [edge-tts](https://github.com/rany2/edge-tts). Las voces se cambian sin tocar código con variables del repo (Settings → Secrets and variables → Actions → Variables):

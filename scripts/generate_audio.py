@@ -186,6 +186,8 @@ def duration_seconds(path: Path) -> int:
 
 
 def main() -> None:
+    from generate_cover import make_cover
+
     pending = [
         parse_episode(p)
         for p in sorted(EPISODES_DIR.glob("*.md"))
@@ -201,20 +203,29 @@ def main() -> None:
         mp3 = out_dir / f"{episode['slug']}.mp3"
         engine = synthesize(episode["body"], mp3)
         seconds = duration_seconds(mp3)
+        # La portada nunca debe frenar la publicación del episodio.
+        cover = out_dir / f"{episode['slug']}.jpg"
+        try:
+            cover_method = make_cover(episode, cover)
+            cover_files = [str(cover)]
+        except Exception as error:  # noqa: BLE001
+            print(f"::warning::No se pudo generar la portada: {error}")
+            cover_method, cover_files = "sin portada", []
         notes = json.dumps({
             "description": episode.get("description", ""),
             "topic": episode.get("topic", ""),
             "date": episode.get("date", ""),
             "duration": seconds,
             "engine": engine,
+            "cover": cover_method,
         }, ensure_ascii=False)
         subprocess.run(
-            ["gh", "release", "create", episode["tag"], str(mp3),
+            ["gh", "release", "create", episode["tag"], str(mp3), *cover_files,
              "--title", episode.get("title", episode["slug"]),
              "--notes", notes, "--latest"],
             check=True,
         )
-        print(f"Publicado {episode['tag']}: {seconds // 60} min, {engine}")
+        print(f"Publicado {episode['tag']}: {seconds // 60} min, {engine}, portada: {cover_method}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,41 @@
+name: Prueba de portada
+
+on:
+  workflow_dispatch:
+    inputs:
+      episodio:
+        description: "Nombre del episodio (sin .md)"
+        required: true
+      modelo:
+        description: "Modelo de imagen de Gemini (vacío = el configurado)"
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  portada:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      IMAGE_MODEL: ${{ inputs.modelo || vars.IMAGE_MODEL || 'gemini-2.5-flash-image' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q pillow
+      - name: Modelos de imagen disponibles
+        run: |
+          KEY="${GEMINI_API_KEY:-$GOOGLE_TTS_API_KEY}"
+          curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$KEY&pageSize=1000" \
+            | python -c "import json,sys; d=json.load(sys.stdin); names=[m['name'] for m in d.get('models',[]) if 'image' in m['name'] or 'imagen' in m['name']]; print('::notice::' + (', '.join(names) if names else json.dumps(d)[:400]))"
+      - name: Generar portada
+        run: |
+          OUT="portada-${{ inputs.episodio }}.jpg"
+          METHOD=$(python scripts/generate_cover.py "episodes/${{ inputs.episodio }}.md" "$OUT")
+          echo "::notice::Portada: $METHOD"
+          gh release view muestras-voces >/dev/null 2>&1 || gh release create muestras-voces --prerelease --latest=false --title "Muestras de voces" --notes "Muestras."
+          gh release upload muestras-voces "$OUT" --clobber
