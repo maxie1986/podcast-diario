@@ -25,7 +25,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       EDGE_VOICE: ${{ vars.EDGE_VOICE || 'es-AR-TomasNeural' }}
       EDGE_RATE: ${{ vars.EDGE_RATE || '+0%' }}
-      GOOGLE_VOICE: ${{ vars.GOOGLE_VOICE || 'es-US-Neural2-B' }}
+      GOOGLE_VOICE: ${{ vars.GOOGLE_VOICE || 'es-US-Chirp3-HD-Charon' }}
       GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
     steps:
       - uses: actions/checkout@v4

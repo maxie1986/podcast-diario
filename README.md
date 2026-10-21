@@ -15,14 +15,15 @@ Los MP3 se guardan como assets de releases, así el repo no crece con archivos d
 
 ## Voz
 
-Por defecto usa [edge-tts](https://github.com/rany2/edge-tts) con `es-AR-TomasNeural`. Se cambia sin tocar código con variables del repo (Settings → Secrets and variables → Actions → Variables):
+Por defecto usa Google Cloud Text-to-Speech con la voz `es-US-Chirp3-HD-Charon` (secret `GOOGLE_TTS_API_KEY`; capa gratuita de 1 millón de caracteres por mes en voces Chirp 3 HD). Si Google falla, cae a [edge-tts](https://github.com/rany2/edge-tts). Las voces se cambian sin tocar código con variables del repo (Settings → Secrets and variables → Actions → Variables):
 
 | Variable | Default | Ejemplo |
 |---|---|---|
+| `GOOGLE_VOICE` | `es-US-Chirp3-HD-Charon` | `es-US-Chirp3-HD-Kore` |
 | `EDGE_VOICE` | `es-AR-TomasNeural` | `es-AR-ElenaNeural` |
 | `EDGE_RATE` | `+0%` | `+8%` |
 
-Respaldo opcional: si existe el secret `GOOGLE_TTS_API_KEY` (Google Cloud Text-to-Speech, capa gratuita de 1 millón de caracteres por mes en voces WaveNet y Neural2) y edge-tts falla, usa Google con la voz `GOOGLE_VOICE` (default `es-US-Neural2-B`).
+Para comparar voces o probar un episodio completo sin tocar el feed: Actions → Muestras de voces → Run workflow.
 
 ## Regenerar un episodio
 

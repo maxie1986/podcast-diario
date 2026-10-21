@@ -15,6 +15,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import generate_audio  # noqa: E402
 from generate_audio import parse_episode, to_speech_text  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,11 +62,22 @@ def main() -> None:
     if not KEY:
         print("::error::Falta el secret GOOGLE_TTS_API_KEY (o está vacío)")
         sys.exit(1)
-    text = sample_text()
     out_dir = ROOT / "build" / "muestras"
     out_dir.mkdir(parents=True, exist_ok=True)
     files, errors = [], []
-    for voice in VOICES:
+    episode_slug = os.environ.get("EPISODE", "").strip()
+    if episode_slug:
+        # Prueba de punta a punta con el mismo código que usa el podcast.
+        episode = parse_episode(ROOT / "episodes" / f"{episode_slug}.md")
+        out = out_dir / f"prueba-{episode_slug}.mp3"
+        engine = generate_audio.synthesize(episode["body"], out)
+        minutes = generate_audio.duration_seconds(out) / 60
+        print(f"::notice::{engine} - {minutes:.1f} min - {out.stat().st_size // 1024} KB")
+        if not engine.startswith("Google"):
+            errors.append("Se usó edge-tts en lugar de Google")
+        files.append(str(out))
+    text = sample_text() if VOICES and not episode_slug else ""
+    for voice in VOICES if not episode_slug else []:
         out = out_dir / f"muestra-{voice}.mp3"
         try:
             synthesize(text, voice, out)

@@ -1,7 +1,7 @@
 """Convierte a MP3 cada episodio de episodes/*.md que todavía no tenga release.
 
 Cada episodio se publica como un GitHub Release con tag ep-<nombre-del-archivo>
-y el MP3 adjunto. Usa edge-tts y, si falla y hay GOOGLE_TTS_API_KEY, Google Cloud TTS.
+y el MP3 adjunto. Usa Google Cloud TTS si hay GOOGLE_TTS_API_KEY y, si falla, edge-tts.
 """
 
 import asyncio
@@ -12,6 +12,8 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -21,7 +23,7 @@ EPISODES_DIR = ROOT / "episodes"
 EDGE_VOICE = os.environ.get("EDGE_VOICE", "es-AR-TomasNeural")
 EDGE_RATE = os.environ.get("EDGE_RATE", "+0%")
 GOOGLE_KEY = os.environ.get("GOOGLE_TTS_API_KEY", "").strip()
-GOOGLE_VOICE = os.environ.get("GOOGLE_VOICE", "es-US-Neural2-B")
+GOOGLE_VOICE = os.environ.get("GOOGLE_VOICE", "es-US-Chirp3-HD-Charon")
 
 
 def parse_episode(path: Path) -> dict:
@@ -73,58 +75,105 @@ async def edge_synthesize(text: str, out: Path) -> None:
     await communicate.save(str(out))
 
 
-def google_synthesize(text: str, out: Path) -> None:
-    # La API acepta hasta 5000 bytes por pedido: se parte por párrafos.
+def split_sections(markdown: str) -> list[str]:
+    """Separa el guion en secciones usando los encabezados markdown."""
+    sections, current = [], []
+    for line in markdown.splitlines():
+        if line.lstrip().startswith("#") and current:
+            sections.append("\n".join(current))
+            current = []
+        current.append(line)
+    if current:
+        sections.append("\n".join(current))
+    return [t for t in (to_speech_text(sec) for sec in sections) if t]
+
+
+def chunk_text(text: str, limit: int = 4500) -> list[str]:
+    """La API acepta hasta 5000 bytes por pedido: se parte por párrafos."""
     chunks, current = [], ""
     for paragraph in text.split("\n\n"):
         candidate = f"{current}\n\n{paragraph}".strip()
-        if len(candidate.encode("utf-8")) > 4500 and current:
+        if len(candidate.encode("utf-8")) > limit and current:
             chunks.append(current)
             current = paragraph
         else:
             current = candidate
     if current:
         chunks.append(current)
+    return chunks
 
-    url = f"https://texttospeech.googleapis.com/v1/text:synthesize?key={GOOGLE_KEY}"
+
+def google_request(text: str, out: Path) -> None:
     language = "-".join(GOOGLE_VOICE.split("-")[:2])
+    payload = json.dumps({
+        "input": {"text": text},
+        "voice": {"languageCode": language, "name": GOOGLE_VOICE},
+        "audioConfig": {"audioEncoding": "LINEAR16", "sampleRateHertz": 24000},
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        f"https://texttospeech.googleapis.com/v1/text:synthesize?key={GOOGLE_KEY}",
+        data=payload, headers={"Content-Type": "application/json"},
+    )
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=180) as response:
+                out.write_bytes(base64.b64decode(json.load(response)["audioContent"]))
+            return
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode()[:400]
+            if error.code < 500 and error.code != 429 or attempt == 2:
+                raise RuntimeError(f"Google TTS HTTP {error.code}: {detail}") from error
+        except urllib.error.URLError:
+            if attempt == 2:
+                raise
+        time.sleep(5 * (attempt + 1))
+
+
+def google_synthesize(markdown: str, out: Path) -> None:
+    """Sintetiza por secciones y las une con silencios para marcar el cambio de tema."""
     with tempfile.TemporaryDirectory() as tmp:
-        parts = []
-        for i, chunk in enumerate(chunks):
-            payload = json.dumps({
-                "input": {"text": chunk},
-                "voice": {"languageCode": language, "name": GOOGLE_VOICE},
-                "audioConfig": {"audioEncoding": "MP3", "sampleRateHertz": 24000},
-            }).encode("utf-8")
-            request = urllib.request.Request(
-                url, data=payload, headers={"Content-Type": "application/json"}
+        tmp_path = Path(tmp)
+        silence = {}
+        for name, seconds in (("pausa_corta", 0.35), ("pausa_larga", 1.2)):
+            silence[name] = tmp_path / f"{name}.wav"
+            subprocess.run(
+                ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
+                 "-i", "anullsrc=r=24000:cl=mono", "-t", str(seconds),
+                 "-c:a", "pcm_s16le", str(silence[name])],
+                check=True,
             )
-            with urllib.request.urlopen(request, timeout=120) as response:
-                audio = base64.b64decode(json.load(response)["audioContent"])
-            part = Path(tmp) / f"{i:03d}.mp3"
-            part.write_bytes(audio)
-            parts.append(part)
-        listing = Path(tmp) / "list.txt"
+        parts = []
+        for s_index, section in enumerate(split_sections(markdown)):
+            if s_index:
+                parts.append(silence["pausa_larga"])
+            for c_index, chunk in enumerate(chunk_text(section)):
+                if c_index:
+                    parts.append(silence["pausa_corta"])
+                part = tmp_path / f"{s_index:03d}_{c_index:02d}.wav"
+                google_request(chunk, part)
+                parts.append(part)
+        listing = tmp_path / "list.txt"
         listing.write_text("".join(f"file '{p}'\n" for p in parts))
         subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0",
-             "-i", str(listing), "-c", "copy", str(out)],
+             "-i", str(listing), "-ac", "1", "-codec:a", "libmp3lame", "-b:a", "64k",
+             str(out)],
             check=True,
         )
 
 
-def synthesize(text: str, out: Path) -> str:
-    try:
-        asyncio.run(edge_synthesize(text, out))
-        if out.exists() and out.stat().st_size > 10_000:
-            return f"edge-tts ({EDGE_VOICE})"
+def synthesize(markdown: str, out: Path) -> str:
+    """Usa Google si hay API key; si falla (o no hay key), cae a edge-tts."""
+    if GOOGLE_KEY:
+        try:
+            google_synthesize(markdown, out)
+            return f"Google Cloud TTS ({GOOGLE_VOICE})"
+        except Exception as error:  # noqa: BLE001
+            print(f"::warning::Google TTS falló, uso edge-tts: {error}")
+    asyncio.run(edge_synthesize(to_speech_text(markdown), out))
+    if not out.exists() or out.stat().st_size < 10_000:
         raise RuntimeError("edge-tts devolvió un archivo vacío")
-    except Exception as error:  # noqa: BLE001
-        print(f"edge-tts falló: {error}", file=sys.stderr)
-        if not GOOGLE_KEY:
-            raise
-    google_synthesize(text, out)
-    return f"Google Cloud TTS ({GOOGLE_VOICE})"
+    return f"edge-tts ({EDGE_VOICE})"
 
 
 def duration_seconds(path: Path) -> int:
@@ -149,9 +198,8 @@ def main() -> None:
     out_dir = ROOT / "build"
     out_dir.mkdir(exist_ok=True)
     for episode in pending:
-        text = to_speech_text(episode["body"])
         mp3 = out_dir / f"{episode['slug']}.mp3"
-        engine = synthesize(text, mp3)
+        engine = synthesize(episode["body"], mp3)
         seconds = duration_seconds(mp3)
         notes = json.dumps({
             "description": episode.get("description", ""),
